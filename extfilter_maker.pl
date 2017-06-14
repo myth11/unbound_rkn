@@ -41,9 +41,8 @@ my $domains_file_hash_old=get_md5_sum($domains_file);
 open (my $DOMAINS_FILE, ">",$domains_file) or die "Could not open DOMAINS '$domains_file' file: $!";
 open (my $DOMAINS_MASK_FILE, ">", $domains_mask_file) or die "Could not open file '$domains_mask_file' file: $!";
 
-my $cur_time=strftime "%F %T", localtime $^T;
-
 my $n_masked_domains = 0;
+my $n_domains = 0;
 my %masked_domains;
 
 my $sth = $dbh->prepare("SELECT * FROM zap2_domains WHERE domain like '*.%'");
@@ -84,34 +83,11 @@ $sth->execute;
 		}
 	}
 	next if($skip);
+        $n_domains++;
 	$logger->debug("Canonical domain: $domain_canonical");
        print $DOMAINS_FILE 'local-data: "', $domain_canonical,' A 172.16.35.1"', "\n";
 }
 $sth->finish();
-
-#$sth = $dbh->prepare("SELECT * FROM zap2_urls");
-#$sth->execute;
-#my $test_dom=0;
-#while (my $ips = $sth->fetchrow_hashref())
-#{
-#	my $url2=$ips->{url};
-#	my $url1=new URI($url2);
-
-#################### Если URL ведет в корень сайт, то блокируем домен #####################
-#                               $test_dom = $url1->path;
-#                               if($test_dom eq '' || $test_dom eq '/')
-#                                {
-#                                       if($url2 !~ /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/)
-#                                               {
-#                                               next;
-#                                               }
-#                               }
-###########################################################################################
-
-#        $logger->debug("Canonical domain: $url1->host()");
-#       print $DOMAINS_FILE 'local-data: "', $url1->host(),' A 172.16.35.1"', "\n";
-#}
-#$sth->finish();
 
 close $DOMAINS_FILE;
 close $DOMAINS_MASK_FILE;
@@ -129,6 +105,7 @@ if($domains_file_hash ne $domains_file_hash_old)
 		exit 1;
 	}
                 $logger->info("UNBOUND successfully reloaded!");
+		$logger->info("Added $n_domains domains, $n_masked_domains masked domains");
 
 } else {
                 $logger->info("Nothing change!");
