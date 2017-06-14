@@ -5,3 +5,5 @@
 Для подключения файлов в конфиг unbound нужно добавить
   include: /etc/unbound/forward.conf
   include: /etc/unbound/domains_mask.conf
+
+В файлы попадают только домены и доменные маски.
