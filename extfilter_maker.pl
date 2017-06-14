@@ -28,10 +28,11 @@ my $db_host = $Config->{'DB.host'} || die "DB.host not defined.";
 my $db_user = $Config->{'DB.user'} || die "DB.user not defined.";
 my $db_pass = $Config->{'DB.password'} || die "DB.password not defined.";
 my $db_name = $Config->{'DB.name'} || die "DB.name not defined.";
-
 # пути к генерируемым файлам:
 my $domains_file = $Config->{'APP.domains'} || "";
 my $domains_mask_file = $Config->{'APP.domains_mask'} || "";
+
+my $ip_apache = $Config->{'APP.ip'} || "127.0.0.1";
 
 my $dbh = DBI->connect("DBI:mysql:database=".$db_name.";host=".$db_host,$db_user,$db_pass,{mysql_enable_utf8 => 1}) or die DBI->errstr;
 $dbh->do("set names utf8");
@@ -58,7 +59,7 @@ while (my $ips = $sth->fetchrow_hashref())
 	$masked_domains{$domain_canonical} = 1;
 	$n_masked_domains++;
 
-       print $DOMAINS_MASK_FILE 'local-data: "', $domain_canonical,'. 3600 IN A 172.16.35.1"', "\n";
+       print $DOMAINS_MASK_FILE 'local-data: "', $domain_canonical,'. 3600 IN A $ip_apache"', "\n";
        print $DOMAINS_MASK_FILE 'local-zone: "', $domain_canonical,'." redirect', "\n";
 }
 $sth->finish();
@@ -85,7 +86,7 @@ $sth->execute;
 	next if($skip);
         $n_domains++;
 	$logger->debug("Canonical domain: $domain_canonical");
-       print $DOMAINS_FILE 'local-data: "', $domain_canonical,' A 172.16.35.1"', "\n";
+       print $DOMAINS_FILE 'local-data: "', $domain_canonical,' A $ip_apache"', "\n";
 }
 $sth->finish();
 
