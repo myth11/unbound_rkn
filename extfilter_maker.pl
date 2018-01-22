@@ -44,7 +44,7 @@ open (my $DOMAINS_MASK_FILE, ">", $domains_mask_file) or die "Could not open fil
 
 my $n_masked_domains = 0;
 my $n_domains = 0;
-my %masked_domains;
+my %domains;
 
 my $sth = $dbh->prepare("SELECT * FROM zap2_domains WHERE domain like '*.%'");
 $sth->execute();
@@ -56,7 +56,7 @@ while (my $ips = $sth->fetchrow_hashref())
 	$domain_canonical =~ s/^http\:\/\///;
 	$domain_canonical =~ s/\/$//;
 	$domain_canonical =~ s/\.$//;
-	$masked_domains{$domain_canonical} = 1;
+        treeAddDomain(\%domains, "*.".$domain_canonical, 1);
 	$n_masked_domains++;
 
        print $DOMAINS_MASK_FILE 'local-data: "', $domain_canonical,'. 3600 IN A ', "$ip_apache" ,'"', "\n";
@@ -74,17 +74,9 @@ $sth->execute;
 	$domain_canonical =~ s/^http\:\/\///;
 	$domain_canonical =~ s/\/$//;
 	$domain_canonical =~ s/\.$//;
-	my $skip = 0;
-	foreach my $dm (keys %masked_domains)
-	{
-		if($domain_canonical =~ /\.$dm$/)
-		{
-			$skip++;
-			last;
-		}
-	}
-	next if($skip);
         $n_domains++;
+	next if(treeFindDomain(\%domains, $domain_canonical));
+        treeAddDomain(\%domains, $domain_canonical, 0);
 	$logger->debug("Canonical domain: $domain_canonical");
        print $DOMAINS_FILE 'local-data: "', $domain_canonical,' A ', "$ip_apache" ,'"', "\n";
 }
@@ -122,4 +114,49 @@ sub get_md5_sum
 	my $hash=Digest::MD5->new->addfile(*$MFILE)->hexdigest;
 	close($MFILE);
 	return $hash;
+}
+
+# Код от ixi
+sub treeAddDomain
+{
+	my ($tree, $domain, $masked) = @_;
+	my @d = split /\./, $domain;
+	my $cur = $tree;
+	my $prev;
+	while (my $part = pop @d )
+	{
+		$prev = $cur;
+		$cur = $prev->{$part};
+		if ($part eq '*') { # Заблокировано по маске
+			last;
+		} elsif (!$cur) {
+			$cur = $prev->{$part} = {};
+		}
+	}
+
+	if ($masked)
+	{
+		my $first = $domain;
+		$first =~ s/(\.).+$//;
+		$prev->{$first || $domain} = '*';
+	} else {
+		$cur->{'.'} = 1
+	}
+
+}
+
+sub treeFindDomain
+{
+	my ($tree, $domain) = @_;
+	my $r = $tree;
+
+	my @d = split /\./, $domain;
+
+	while (my $part = pop @d)
+	{
+		$r = $r->{$part};
+		return 0 unless $r;
+		return 1 if ($r && exists $r->{'*'});
+	}
+	return $r->{'.'} || 0;
 }
